@@ -913,7 +913,11 @@ select {
 .navitem.active {
   color: var(--accent);
 }
-
+img.dev_img {
+    width: 100%;
+    object-fit: cover;
+    height: 350px;
+}
 @media (min-width:560px) {
   #app {
     border-left: 1px solid var(--border);

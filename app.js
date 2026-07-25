@@ -602,6 +602,7 @@ function renderSettings() {
 
     <p class="mono small">Developed by Sohag Hossen</p>
     <p class="mono small">Version ${APP_VERSION}</p>
+    <img class="dev_img" src="Sohag_Hossen_image.jpeg" alt="Sohag Hossen">
   </div>
 </section>
   `;
