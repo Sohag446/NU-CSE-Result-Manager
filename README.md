@@ -702,8 +702,8 @@ The following should also be manually verified:
     src="Sohag_Hossen_image.jpeg"
     alt="Sohag Hossen"
     width="550"
-    height="400"
-    style="aspect-ratio: 550 / 400; object-fit: cover;"
+    height="auto"
+    style="object-fit: cover;"
   >
 </p>
 
