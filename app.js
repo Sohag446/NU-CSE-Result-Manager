@@ -593,12 +593,17 @@ function renderSettings() {
   </section>
 
   <section class="section">
-    <div class="card-flat about-card">
-      <h3>About</h3>
-      <p>NU CSE Result Manager helps National University CSE students record semester results and track GPA/CGPA offline. All data stays on this device unless you export it.</p>
-      <p class="mono small">Version ${APP_VERSION}</p>
-    </div>
-  </section>
+  <div class="card-flat about-card">
+    <h3>About</h3>
+    <p>
+      NU CSE Result Manager helps National University CSE students record semester
+      results and track GPA/CGPA offline. All data stays on this device unless you export it.
+    </p>
+
+    <p class="mono small">Developed by Sohag Hossen</p>
+    <p class="mono small">Version ${APP_VERSION}</p>
+  </div>
+</section>
   `;
 }
 
