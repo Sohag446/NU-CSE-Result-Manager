@@ -12,6 +12,15 @@ function defaultState() {
   return {
     version: APP_VERSION,
     settings: { theme: 'light' },
+    profile: {
+      studentName: '',
+      registrationNumber: '',
+      collegeName: '',
+      currentSemester: '',
+      studentId: '',
+      email: '',
+      profileCompleted: false
+    },
     results: {} // semId -> { selectedOptTheory, selectedOptLab, courses: { code: {method, marks, grade, gpa} } }
   };
 }
@@ -149,6 +158,19 @@ function fmt(n, d = 2) {
   return (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toFixed(d);
 }
 
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 /* ---------------- Router ---------------- */
 
 const APP = document.getElementById('app');
@@ -172,6 +194,15 @@ function currentRoute() {
 }
 
 function render() {
+  // First-time / incomplete profile: show setup screen instead of the app,
+  // regardless of the current route hash.
+  if (!STATE.profile || !STATE.profile.profileCompleted) {
+    APP.innerHTML = `<div class="screen">${renderProfileSetup()}</div>`;
+    window.scrollTo(0, 0);
+    wireProfileSetup();
+    return;
+  }
+
   const { screen, param } = currentRoute();
   let html = '';
   switch (screen) {
@@ -180,6 +211,7 @@ function render() {
     case 'add': html = renderAddResult(param); break;
     case 'calculator': html = renderCalculator(); break;
     case 'grades': html = renderGradeScale(); break;
+    case 'editprofile': html = renderEditProfile(); break;
     case 'settings': html = renderSettings(); break;
     default: html = renderDashboard();
   }
@@ -207,6 +239,31 @@ function renderBottomNav(active) {
   </nav>`;
 }
 
+/* ---------------- Student profile card ---------------- */
+
+function renderStudentProfileCard() {
+  const p = STATE.profile;
+  if (!p || !p.profileCompleted) return '';
+  return `
+  <section class="profile-card">
+    <div class="profile-card-top">
+      <div class="profile-avatar">${escapeHtml(initials(p.studentName))}</div>
+      <div class="profile-main">
+        <p class="profile-welcome">Welcome back,</p>
+        <h2 class="profile-name">${escapeHtml(p.studentName)}</h2>
+      </div>
+    </div>
+    <div class="profile-details">
+      <div class="profile-detail-row"><span>Registration No.</span><strong>${escapeHtml(p.registrationNumber)}</strong></div>
+      <div class="profile-detail-row"><span>College</span><strong>${escapeHtml(p.collegeName)}</strong></div>
+      <div class="profile-detail-row"><span>Current Semester</span><strong>${escapeHtml(p.currentSemester)}</strong></div>
+      ${p.studentId ? `<div class="profile-detail-row"><span>Student ID</span><strong>${escapeHtml(p.studentId)}</strong></div>` : ''}
+      ${p.email ? `<div class="profile-detail-row"><span>Email</span><strong>${escapeHtml(p.email)}</strong></div>` : ''}
+    </div>
+  </section>
+  `;
+}
+
 /* ---------------- Dashboard ---------------- */
 
 function renderDashboard() {
@@ -227,6 +284,8 @@ function renderDashboard() {
       <h1 class="pagetitle">Result Manager</h1>
     </div>
   </header>
+
+  ${renderStudentProfileCard()}
 
   <section class="hero-card">
     <div class="dial" style="--deg:${arcDeg}deg">
@@ -567,6 +626,134 @@ function renderGradeScale() {
   `;
 }
 
+/* ---------------- First-time Student Profile Setup ---------------- */
+
+function profileFormFields(p) {
+  p = p || {};
+  return `
+  <div class="field">
+    <label>Student Name *</label>
+    <input class="input" id="pfName" type="text" placeholder="e.g. Sohag Hossen" value="${escapeHtml(p.studentName)}">
+  </div>
+  <div class="field">
+    <label>Registration Number *</label>
+    <input class="input" id="pfReg" type="text" placeholder="e.g. 123456789" value="${escapeHtml(p.registrationNumber)}">
+  </div>
+  <div class="field">
+    <label>College Name *</label>
+    <input class="input" id="pfCollege" type="text" placeholder="e.g. ABC College" value="${escapeHtml(p.collegeName)}">
+  </div>
+  <div class="field">
+    <label>Current Semester *</label>
+    <select class="input" id="pfSemester">
+      <option value="">— Select semester —</option>
+      ${SEMESTERS.map(s => `<option value="${s.name}" ${p.currentSemester === s.name ? 'selected' : ''}>${s.name}</option>`).join('')}
+    </select>
+  </div>
+  <div class="field">
+    <label>Student ID / Roll Number (optional)</label>
+    <input class="input" id="pfId" type="text" placeholder="e.g. CSE-2021-045" value="${escapeHtml(p.studentId)}">
+  </div>
+  <div class="field">
+    <label>Email Address (optional)</label>
+    <input class="input" id="pfEmail" type="email" placeholder="e.g. name@example.com" value="${escapeHtml(p.email)}">
+  </div>
+  <div class="result-banner warn" id="pfError"></div>`;
+}
+
+function readProfileForm() {
+  return {
+    studentName: document.getElementById('pfName').value.trim(),
+    registrationNumber: document.getElementById('pfReg').value.trim(),
+    collegeName: document.getElementById('pfCollege').value.trim(),
+    currentSemester: document.getElementById('pfSemester').value,
+    studentId: document.getElementById('pfId').value.trim(),
+    email: document.getElementById('pfEmail').value.trim()
+  };
+}
+
+function validateProfileForm(data) {
+  if (!data.studentName || !data.registrationNumber || !data.collegeName || !data.currentSemester) {
+    return 'Please fill in all required fields: Student Name, Registration Number, College Name, and Current Semester.';
+  }
+  return null;
+}
+
+function renderProfileSetup() {
+  return `
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Welcome</p>
+      <h1 class="pagetitle">Set Up Your Profile</h1>
+    </div>
+  </header>
+  <section class="section" style="margin-top:0">
+    <div class="card-flat">
+      <p class="hint" style="margin-top:0;margin-bottom:14px">Tell us a bit about yourself to personalize your dashboard. Fields marked * are required.</p>
+      ${profileFormFields(STATE.profile)}
+      <button class="btn-primary" id="pfSaveBtn" style="width:100%;margin-top:6px">Save &amp; Continue</button>
+    </div>
+  </section>
+  `;
+}
+
+function wireProfileSetup() {
+  const btn = document.getElementById('pfSaveBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const data = readProfileForm();
+    const err = validateProfileForm(data);
+    const errBox = document.getElementById('pfError');
+    if (err) {
+      errBox.className = 'result-banner warn';
+      errBox.textContent = err;
+      return;
+    }
+    STATE.profile = Object.assign({}, data, { profileCompleted: true });
+    saveState();
+    if (!location.hash) location.hash = '#/dashboard';
+    render();
+  });
+}
+
+/* ---------------- Edit Profile ---------------- */
+
+function renderEditProfile() {
+  return `
+  <header class="topbar with-back">
+    <a href="#/settings" class="back-btn">←</a>
+    <div>
+      <p class="eyebrow">Profile</p>
+      <h1 class="pagetitle">Edit Profile</h1>
+    </div>
+  </header>
+  <section class="section" style="margin-top:0">
+    <div class="card-flat">
+      ${profileFormFields(STATE.profile)}
+      <button class="btn-primary" id="pfSaveBtn" style="width:100%;margin-top:6px">Save Changes</button>
+    </div>
+  </section>
+  `;
+}
+
+function wireEditProfile() {
+  const btn = document.getElementById('pfSaveBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const data = readProfileForm();
+    const err = validateProfileForm(data);
+    const errBox = document.getElementById('pfError');
+    if (err) {
+      errBox.className = 'result-banner warn';
+      errBox.textContent = err;
+      return;
+    }
+    STATE.profile = Object.assign({}, STATE.profile, data, { profileCompleted: true });
+    saveState();
+    navigate('#/settings');
+  });
+}
+
 /* ---------------- Settings ---------------- */
 
 function renderSettings() {
@@ -582,12 +769,16 @@ function renderSettings() {
         <span>Dark mode</span>
         <button class="switch ${STATE.settings.theme === 'dark' ? 'on' : ''}" id="themeSwitch"><span class="knob"></span></button>
       </div>
+      <a href="#/editprofile" class="settings-row link">
+        <span>Edit Profile</span><span class="chev">→</span>
+      </a>
       <a href="#/grades" class="settings-row link">
         <span>Grading system</span><span class="chev">→</span>
       </a>
       <button class="settings-row" id="exportBtn"><span>Export data (JSON)</span><span class="chev">↓</span></button>
       <label class="settings-row" for="importInput"><span>Import backup</span><span class="chev">↑</span></label>
       <input type="file" id="importInput" accept="application/json" class="hidden">
+      <button class="settings-row danger" id="resetProfileBtn"><span>Reset Student Profile</span><span class="chev">⟲</span></button>
       <button class="settings-row danger" id="resetBtn"><span>Reset all data</span><span class="chev">⟲</span></button>
     </div>
   </section>
@@ -627,6 +818,7 @@ function attachScreenHandlers(screen) {
   if (screen === 'add') wireAddResult();
   if (screen === 'results') wireResultsList();
   if (screen === 'calculator') wireCalculator();
+  if (screen === 'editprofile') wireEditProfile();
   if (screen === 'settings') wireSettings();
 
   // semester detail delete
@@ -921,6 +1113,17 @@ function wireSettings() {
           applyTheme();
           navigate('#/dashboard');
         }
+      }
+    });
+  }
+
+  const resetProfileBtn = document.getElementById('resetProfileBtn');
+  if (resetProfileBtn) {
+    resetProfileBtn.addEventListener('click', () => {
+      if (confirm('Reset your student profile? Your semester results will NOT be deleted, but you will need to set up your profile again.')) {
+        STATE.profile = defaultState().profile;
+        saveState();
+        render();
       }
     });
   }
